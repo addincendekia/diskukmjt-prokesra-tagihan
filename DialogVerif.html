@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+    <script src="//unpkg.com/alpinejs" defer></script>
+  </head>
+  <body>
+    <div class="position-relative" x-data="dialog">
+      <ul class="list-group mb-5">
+        <template x-for="month in months" :key="month">
+          <li class="list-group-item">
+            <input
+              class="form-check-input me-1"
+              type="radio"
+              x-model="monthSelected"
+              x-bind:value="month[0] + month.slice(1).toLowerCase()"
+            >
+
+            <label class="form-check-label text-capitalize" x-text="month"></label>
+
+            <span
+              class="badge text-sm text-bg-success rounded-pill position-absolute end-0 me-3"
+              x-show="monthsVerified.includes(month[0] + month.slice(1).toLowerCase())" 
+            >
+              ✓ 
+            </span>
+          </li>
+        </template>
+      </ul>
+
+      <div class="position-fixed bg-white bottom-0 w-100">
+        <div class="d-flex">
+          <button
+            type="button"
+            class="w-100 btn btn-primary me-1"
+            x-on:click="verifTagihan()"
+            x-bind:disabled="isVerifying || !monthSelected"
+          >
+            <div x-cloak x-show="!isVerifying">
+              Verif <span x-text="monthSelected"></span>
+            </div>
+            <div x-show="isVerifying">Verifying...</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener('alpine:init', () => {
+        Alpine.data('dialog', () => {
+          const monthsVerified = '<?= props.months_verified ?>' || [];
+          const months = JSON.parse('<?= props.months ?>' || '[]');
+
+          return {
+              months,
+              monthsVerified,
+              monthSelected: null,
+
+              isVerifying: false,
+
+              verifTagihan() {
+                this.isVerifying = true;
+
+                if (!this.monthSelected) {
+                  this.isVerifying = false;
+                  alert("Bulan tagih belum dipilih");
+                  return;
+                }
+
+                google.script.run
+                  .withFailureHandler((err) => {
+                    this.isVerifying = true;
+                    alert('Gagal verifikasi data');
+                  })                 
+                  .verifTagihan(this.monthSelected);
+              },
+          }
+        })
+      })
+    </script>
+  </body>
+</html>

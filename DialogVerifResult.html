@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+    <script src="//unpkg.com/alpinejs" defer></script>
+  </head>
+  <body class="position-relative">
+    <div x-data="dialog" x-effect="document.body.classList.toggle('overflow-hidden', isResetModalShow)">
+      <div class="d-flex">
+        <button
+          type="button"
+          class="btn btn-light ms-1 mb-4"
+          x-on:click="openDialogVerif()"
+        >
+          ← Kembali
+        </button>
+      </div>
+
+      <div class="d-flex w-100">
+        <div class="w-50 mb-2">
+          <label for="verifiedAt" class="d-block fw-bold">Tanggal Verif</label>
+          <input
+            type="text"
+            readonly
+            class="form-control-plaintext pt-0"
+            id="verifiedAt"
+            x-bind:value="result.verifiedAt"
+          >
+        </div>
+
+        <div class="w-50 mb-2">
+          <label for="verifiedMonth" class="d-block fw-bold">Bulan</label>
+          <input
+            type="text"
+            readonly
+            class="form-control-plaintext pt-0"
+            id="verifiedMonth"
+            x-bind:value="result.verifiedMonth"
+          >
+        </div>
+      </div>
+
+      <div class="d-flex w-100">
+        <div class="w-50 mb-2">
+          <label for="totalDebitur" class="d-block fw-bold">Total Debitur</label>
+          <input
+            type="text"
+            readonly
+            class="form-control-plaintext pt-0"
+            id="totalDebitur"
+            x-bind:value="formatNumber(result.totalDebitur)"
+          >
+        </div>
+
+        <div class="w-50 mb-2">
+          <label for="totalSubsidi" class="d-block fw-bold">Total Subsidi</label>
+          <input
+            type="text"
+            readonly
+            class="form-control-plaintext pt-0"
+            id="totalSubsidi"
+            x-bind:value="formatNumber(result.totalSubsidi, 'currency')"
+          >
+        </div>
+      </div>
+
+      <ul class="list-group">
+        <li class="list-group-item">
+          <input
+            class="form-check-input me-1"
+            type="checkbox"
+            x-bind:checked="!result.hasInvalid"
+            disabled
+          >
+          <label class="form-check-label text-capitalize">Tidak ada selisih perhitungan</label>
+          <span
+            class="badge text-sm text-bg-danger rounded-pill position-absolute end-0 me-3"
+            x-cloak
+            x-show="result.hasInvalid" 
+          >
+            ! 
+          </span>
+        </li>
+
+        <li class="list-group-item">
+          <input
+            class="form-check-input me-1"
+            type="checkbox"
+            x-bind:checked="!result.hasOverDue"
+            disabled
+          >
+          <label class="form-check-label text-capitalize">Tidak melebihi jatuh tempo</label>
+          <span
+            class="badge text-sm text-bg-danger rounded-pill position-absolute end-0 me-3"
+            x-cloak
+            x-show="result.hasOverDue" 
+          >
+            ! 
+          </span>
+        </li>
+
+        <li class="list-group-item">
+          <input
+            class="form-check-input me-1"
+            type="checkbox"
+            x-bind:checked="!result.hasOverPlafond"
+            disabled
+          >
+          <label class="form-check-label text-capitalize">Tidak melebihi plafond subsidi</label>
+          <span
+            class="badge text-sm text-bg-danger rounded-pill position-absolute end-0 me-3"
+            x-cloak
+            x-show="result.hasOverPlafond" 
+          >
+            ! 
+          </span>
+        </li>
+      </ul>
+
+      <div style="height: 85px"></div>
+
+      <div class="position-fixed bg-white bottom-0 w-100">
+        <div class="d-flex flex-column">
+          <button
+            type="button"
+            class="w-100 btn btn-primary mb-2"
+            x-on:click="openResultDetail()"
+            x-bind:disabled="isLoading"
+          >
+            <span x-show="!isLoading">Lihat Detail</span>
+            <span x-show="isLoading">redirecting...</span>
+          </button>
+
+          <button
+            type="button"
+            class="w-100 btn btn-link m-0 p-0"
+            style="margin-top: -5px"
+            x-on:click="isResetModalShow = true"
+            x-bind:disabled="isLoading"
+          >
+            Ulang dari Awal
+          </button>
+        </div>
+      </div>
+
+      <!-- modal -->
+      <div 
+        class="modal fade"
+        tabindex="-1"
+        x-cloak
+        x-show="isResetModalShow"
+        x-bind:class="{ 'show d-block': isResetModalShow }"
+      >
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Konfirmasi</h5>
+              <button
+                type="button"
+                class="btn-close"
+                x-on:click="isResetModalShow = false"
+                x-bind:disabled="isResetModalLoading"
+              ></button>
+            </div>
+
+            <div class="modal-body">
+              <p>Yakin ingin mereset hasil? perhitungan akan dihapus.</p>
+            </div>
+
+            <div class="modal-footer">
+              <button
+                class="btn
+                btn-secondary" x-on:click="isResetModalShow = false"
+                x-bind:disabled="isResetModalLoading"
+              >
+                Batal
+              </button>
+              <button
+                class="btn btn-danger"
+                x-on:click="resetResult()"
+                x-bind:disabled="isResetModalLoading"
+              >
+                <span x-show="!isResetModalLoading">Ya, ulangi</span>
+                <span x-show="isResetModalLoading">Resetting...</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- modal backdrop -->
+      <div 
+        class="modal-backdrop bg-white fade"
+        x-cloak
+        x-show="isResetModalShow"
+        x-bind:class="{ 'show': isResetModalShow }"
+      ></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener('alpine:init', () => {
+        Alpine.data('dialog', () => {
+          const result = JSON.parse('<?!= props.result ?>' || '{}');
+
+          return {
+              isLoading: false,
+              isResetModalShow: false,
+              isResetModalLoading: false,
+
+              result: result,
+              formatNumber(value, style = 'decimal') {
+                const formatter = new Intl.NumberFormat('id-ID', {
+                  style,
+                  currency: 'IDR',
+                });
+
+                return formatter.format(Number(value));
+              },
+              openDialogVerif() {
+                google.script.run.dialogVerif();
+              },
+              openResultDetail() {
+                this.isLoading = true;
+
+                google.script.run
+                  .withFailureHandler((err) => {
+                    this.isLoading = false;
+                  })
+                  .withSuccessHandler(() => {
+                    google.script.host.close();
+                  })
+                  .navigateToResult();
+              },
+              resetResult() {
+                this.isResetModalLoading = true;
+
+                google.script.run
+                  .withSuccessHandler(() => {
+                    google.script.host.close();
+                  })
+                  .withFailureHandler((err) => {
+                    this.isResetModalLoading = false;
+                    this.isResetModalShow = false;
+
+                    console.log(err);
+
+                    alert('Gagal reset data');
+                  })
+                  .resetVerifResult();
+              }
+          }
+        })
+      })
+    </script>
+  </body>
+</html>
