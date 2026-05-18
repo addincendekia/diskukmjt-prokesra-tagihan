@@ -1,3 +1,7 @@
+const FILE_ID_SOURCE = '165qo3-b5p-2UKDKtnPOukuUPRokPyV7yac6QwGk3FNs';
+
+const DEFAULT_PERIOD_YEAR = 2026;
+
 const DEFAULT_RESULT = {
   verifiedAt: null,
   verifiedMonth: null,
@@ -7,8 +11,6 @@ const DEFAULT_RESULT = {
   hasOverDue: false,
   hasOverPlafond: false,
 };
-
-const DEFAULT_PERIOD_YEAR = 2025;
 
 const MONTH_MAPPED = {
   JANUARI: 1,
@@ -25,31 +27,50 @@ const MONTH_MAPPED = {
   DESEMBER: 12,
 };
 
+// Mapping dari source header ke expected header
+const HEADER_MAPPING = {
+  'NO LOAN': 'NO LOAN',
+  'Tipe Loan': 'TIPE LOAN',
+  Cabang: 'CABANG',
+  'No PK': 'NO PK',
+  Nama: 'NAMA',
+  Alamat: 'ALAMAT',
+  Usaha: 'USAHA',
+  'Tanggal Realisasi': 'MULAI',
+  'Tanggal Jatuh Tempo': 'JATUH TEMPO',
+  'Jangka Waktu': 'JANGKA WAKTU',
+  Plafond: 'PLAFOND',
+  'Total Subsidi': 'TOTAL SUBSIDI',
+  'Sisa Kredit': 'SISA KREDIT',
+  'Tunggakan Pokok': 'TUNGGAKAN POKOK',
+  'Tunggakan Bunga': 'TUNGGAKAN BUNGA',
+  Kolektibilitas: 'KOLEKTIBILITAS',
+};
+
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu("📊 Rekon Tools")
-    .addItem("Verif Tagihan", "dialogVerif")
-    .addItem("Verif Terakhir", "dialogVerifResult")
-    .addItem("Lihat Rekapitulasi", "navigateToRekapitulasi")
+    .createMenu('📊 Rekon Tools')
+    .addItem('Verif Tagihan', 'dialogVerif')
+    .addItem('Verif Terakhir', 'dialogVerifResult')
+    .addItem('Lihat Rekapitulasi', 'navigateToRekapitulasi')
     .addToUi();
 }
 
 function dialogVerif() {
   const props = PropertiesService.getScriptProperties();
-  const months = JSON.stringify(Object.keys(MONTH_MAPPED)
-    .map((m) => m[0].toUpperCase() + m.slice(1)));
+  const months = JSON.stringify(
+    Object.keys(MONTH_MAPPED).map((m) => m[0].toUpperCase() + m.slice(1)),
+  );
 
-  const html = HtmlService.createTemplateFromFile("DialogVerif");
+  const html = HtmlService.createTemplateFromFile('DialogVerif');
   html.props = {
     months,
-    months_verified: JSON.parse(
-      props.getProperty("sheetsVerified") || "[]",
-    )
+    months_verified: JSON.parse(props.getProperty('sheetsVerified') || '[]'),
   };
 
   SpreadsheetApp.getUi().showModalDialog(
     html.evaluate().setWidth(350).setHeight(350),
-    "Verif Tagihan"
+    'Verif Tagihan',
   );
 }
 
@@ -57,63 +78,69 @@ function dialogVerifResult() {
   const props = PropertiesService.getScriptProperties();
 
   let result = DEFAULT_RESULT;
-  if (props.getProperty("result")) {
-    result = JSON.parse(props.getProperty("result"));
+  if (props.getProperty('result')) {
+    result = JSON.parse(props.getProperty('result'));
   }
 
-  const html = HtmlService.createTemplateFromFile("DialogVerifResult");
-  html.props = { 
-    result: JSON.stringify({ ...result })
+  const html = HtmlService.createTemplateFromFile('DialogVerifResult');
+  html.props = {
+    result: JSON.stringify({ ...result }),
   };
 
   SpreadsheetApp.getUi().showModalDialog(
     html.evaluate().setWidth(350).setHeight(350),
-    "Verif Tagihan - Result"
+    'Verif Tagihan - Result',
   );
 }
 
-function verifTagihan(month = '') {
+function verifTagihan(month = 'JANUARI') {
+  const INDEX_HEADER = 4;
+  const INDEX_DATA_START = 7;
+
   const verifChecklist = { ...DEFAULT_RESULT };
 
   const props = PropertiesService.getScriptProperties();
   const sheetsVerified = new Set(
-    JSON.parse(props.getProperty("sheetsVerified") || "[]")
+    JSON.parse(props.getProperty('sheetsVerified') || '[]'),
   );
 
   const activeSS = SpreadsheetApp.getActiveSpreadsheet();
 
-  // const sourceSS = SpreadsheetApp.openById(FILE_ID_SOURCE);
-  const sourceSheet = activeSS.getSheetByName(month);
+  const sourceSS = SpreadsheetApp.openById(FILE_ID_SOURCE);
+  const sourceSheet = sourceSS.getSheetByName(`TAGIHAN ${month} 2026`);
 
-  // const targetSS = SpreadsheetApp.getActiveSpreadsheet();
-  // const targetSheet = targetSS.getSheetByName(month);
-  const targetSheet = sourceSheet;
-
-  const resultSheet = activeSS.getSheetByName("RESULT");
-
-  const sourceData = sourceSheet.getDataRange().getValues();
-  const sourceDataHeader = sourceData[0] || [];
-  const sourceDataColumn = {
-    "NO LOAN": sourceDataHeader.indexOf("NO LOAN"),
-    "MULAI": sourceDataHeader.indexOf("MULAI"),
-    "JATUH TEMPO": sourceDataHeader.indexOf("JATUH TEMPO"),
-    "TOTAL BUNGA DIBAYAR": sourceDataHeader.indexOf("TOTAL BUNGA DIBAYAR"),
-    "HITUNGAN BPR": sourceDataHeader.indexOf("HITUNGAN BPR"),
-    "HITUNGAN DISKOP": sourceDataHeader.indexOf("HITUNGAN DISKOP"),
-    "SELISIH": sourceDataHeader.indexOf("SELISIH"),
-    "STATUS": sourceDataHeader.indexOf("SELISIH") + 1,
-    "KET": sourceDataHeader.indexOf("KET"),
-  };
-
-  if (sourceDataHeader.indexOf('STATUS') === -1) {
-    sourceDataHeader.splice(sourceDataColumn['STATUS'], 0, 'STATUS');
+  let targetSheet = activeSS.getSheetByName(month);
+  if (!targetSheet) {
+    targetSheet = activeSS.insertSheet(month);
   }
 
-  for (let i = 1; i < sourceData.length; i++) {
-    if (sourceData[i].length === 23) {
-      sourceData[i].splice(sourceDataColumn['STATUS'], 0, '');
+  const resultSheet = activeSS.getSheetByName('RESULT');
+
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const sourceDataHeader = sourceData[INDEX_HEADER] || [];
+  const sourceDataColumn = remapDataColumn(sourceDataHeader, month);
+
+  const PROCESSED_HEADER = [
+    ...Object.values(HEADER_MAPPING),
+    'TOTAL BUNGA DIBAYAR',
+    'HITUNGAN BPR',
+    'HITUNGAN DISKOP',
+    'SELISIH',
+    'STATUS',
+    'KET',
+  ];
+  const INDEX_DATA_END = sourceData.length - 1; // Last row with data (exclude total/subsidi if exist)
+
+  for (let i = 0; i < sourceData.length; i++) {
+    // Extend all data rows to match header length
+    while (sourceData[i].length < PROCESSED_HEADER.length) {
+      sourceData[i].push('');
     }
-    
+
+    // Skip header rows
+    if (i < INDEX_DATA_START) continue;
+    if (i >= INDEX_DATA_END) continue;
+
     const row = sourceData[i];
     const notes = [];
 
@@ -131,12 +158,13 @@ function verifTagihan(month = '') {
     const paidMonth = MONTH_MAPPED[month.toUpperCase()];
     const paidYear = DEFAULT_PERIOD_YEAR;
 
-    const dateDue = new Date(row[sourceDataColumn['JATUH TEMPO']]); 
-    const dateDueMonth = dateDue.getMonth(); 
+    const dateDue = new Date(row[sourceDataColumn['JATUH TEMPO']]);
+    const dateDueMonth = dateDue.getMonth();
     const dateDueYear = dateDue.getFullYear();
 
     const isOverDueYear = paidYear > dateDueYear;
-    const isOverDueMonth = paidYear == dateDueYear && (paidMonth - 1) > dateDueMonth;
+    const isOverDueMonth =
+      paidYear == dateDueYear && paidMonth - 1 > dateDueMonth;
     if (isOverDueYear || isOverDueMonth) {
       verifChecklist.hasOverDue = true;
       notes.push(`overdue`);
@@ -144,11 +172,10 @@ function verifTagihan(month = '') {
 
     // 3. check differentiate, add status valid/invalid
     const calcDiff = calcBPR - calcDiskop;
-    const calcStatus = (calcDiff <= -1000 || calcDiff >= 1000)
-      ? 'invalid'
-      : 'valid';
+    const calcStatus =
+      calcDiff <= -1000 || calcDiff >= 1000 ? 'invalid' : 'valid';
 
-    if (calcStatus === "invalid") {
+    if (calcStatus === 'invalid') {
       verifChecklist.hasInvalid = true;
       notes.push('invalid');
     }
@@ -162,46 +189,58 @@ function verifTagihan(month = '') {
     sourceData[i][sourceDataColumn['STATUS']] = notes.join(', ');
   }
 
-  targetSheet.getRange(1, 1, sourceData.length, sourceData[0].length).setValues(sourceData);
+  const processedData = [
+    // header
+    PROCESSED_HEADER,
+    // data
+    ...sourceData.slice(INDEX_DATA_START, INDEX_DATA_END),
+  ];
+
+  targetSheet
+    .getRange(1, 1, processedData.length, processedData[0].length)
+    .setValues(processedData);
 
   const timestamp = Utilities.formatDate(
     new Date(),
     activeSS.getSpreadsheetTimeZone(),
-    "dd/MM/yyyy HH:mm:ss"
+    'dd/MM/yyyy HH:mm:ss',
   );
   resultSheet.getRange(1, 3).setValue(timestamp);
   resultSheet.getRange(2, 3).setValue(month);
 
   sheetsVerified.add(month);
 
-  props.setProperty("sheetsVerified", JSON.stringify([...sheetsVerified]));
-  props.setProperty("result", JSON.stringify({
-    ...verifChecklist,
-    verifiedAt: timestamp,
-    verifiedMonth: month,
-  }));
+  props.setProperty('sheetsVerified', JSON.stringify([...sheetsVerified]));
+  props.setProperty(
+    'result',
+    JSON.stringify({
+      ...verifChecklist,
+      verifiedAt: timestamp,
+      verifiedMonth: month,
+    }),
+  );
 
   dialogVerifResult();
 }
 
 function resetVerifProcessed() {
-  PropertiesService.getScriptProperties().deleteProperty("sheetsVerified");
+  PropertiesService.getScriptProperties().deleteProperty('sheetsVerified');
 
   const currentSS = SpreadsheetApp.getActiveSpreadsheet();
-  currentSS.toast(`Progress back to 0`, "Reseted Data", 2);
+  currentSS.toast(`Progress back to 0`, 'Reseted Data', 2);
 }
 
 function resetVerifResult() {
-  PropertiesService.getScriptProperties().deleteProperty("result");
+  PropertiesService.getScriptProperties().deleteProperty('result');
 
   const currentSS = SpreadsheetApp.getActiveSpreadsheet();
 
   const sheetResult = currentSS.getSheetByName('RESULT');
-  sheetResult .getRange(1, 3).clearContent();
-  sheetResult .getRange(2, 3).clearContent();
+  sheetResult.getRange(1, 3).clearContent();
+  sheetResult.getRange(2, 3).clearContent();
   // sheetResult .getRange(5, 3, 4, 2).clearContent();
 
-  currentSS.toast(`Result back to null`, "Reseted Data", 2);
+  currentSS.toast(`Result back to null`, 'Reseted Data', 2);
 }
 
 function navigateToResult() {
@@ -210,22 +249,24 @@ function navigateToResult() {
 }
 
 function navigateToRekapitulasi() {
-  const url = 'https://docs.google.com/spreadsheets/d/1JSvQXVhC6InSpULihdoxNGrIjsoZ5V7OplV5CptWc_c';
-  
-  const html = HtmlService.createHtmlOutput(`
+  const url =
+    'https://docs.google.com/spreadsheets/d/1JSvQXVhC6InSpULihdoxNGrIjsoZ5V7OplV5CptWc_c';
+
+  const html = HtmlService.createHtmlOutput(
+    `
       <script>
         window.open("${url}", "_blank");
         google.script.host.close();
       </script>
 
       <p>Redirecting...</p>
-    `)
+    `,
+  )
     .setWidth(250)
     .setHeight(150);
 
-  SpreadsheetApp.getUi().showModalDialog(html, "Opening Rekapitulasi");
+  SpreadsheetApp.getUi().showModalDialog(html, 'Opening Rekapitulasi');
 }
-
 
 // const props = PropertiesService.getScriptProperties();
 // props.setProperty("sheetsVerified", JSON.stringify(['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November']));
