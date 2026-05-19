@@ -27,26 +27,6 @@ const MONTH_MAPPED = {
   DESEMBER: 12,
 };
 
-// Mapping dari source header ke expected header
-const HEADER_MAPPING = {
-  'NO LOAN': 'NO LOAN',
-  'Tipe Loan': 'TIPE LOAN',
-  Cabang: 'CABANG',
-  'No PK': 'NO PK',
-  Nama: 'NAMA',
-  Alamat: 'ALAMAT',
-  Usaha: 'USAHA',
-  'Tanggal Realisasi': 'MULAI',
-  'Tanggal Jatuh Tempo': 'JATUH TEMPO',
-  'Jangka Waktu': 'JANGKA WAKTU',
-  Plafond: 'PLAFOND',
-  'Total Subsidi': 'TOTAL SUBSIDI',
-  'Sisa Kredit': 'SISA KREDIT',
-  'Tunggakan Pokok': 'TUNGGAKAN POKOK',
-  'Tunggakan Bunga': 'TUNGGAKAN BUNGA',
-  Kolektibilitas: 'KOLEKTIBILITAS',
-};
-
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📊 Rekon Tools')
@@ -94,6 +74,7 @@ function dialogVerifResult() {
 }
 
 function verifTagihan(month = 'JANUARI') {
+  const monthUpper = month.toUpperCase();
   const INDEX_HEADER = 4;
   const INDEX_DATA_START = 7;
 
@@ -104,43 +85,33 @@ function verifTagihan(month = 'JANUARI') {
     JSON.parse(props.getProperty('sheetsVerified') || '[]'),
   );
 
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-
   const sourceSS = SpreadsheetApp.openById(FILE_ID_SOURCE);
-  const sourceSheet = sourceSS.getSheetByName(`TAGIHAN ${month} 2026`);
+  const sourceSheet = sourceSS.getSheetByName(`TAGIHAN ${monthUpper} 2026`);
 
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const sourceDataHeader = sourceData[INDEX_HEADER] || [];
+  const sourceDataColumn = remapDataColumn(sourceDataHeader, monthUpper);
+
+  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
+  const resultSheet = activeSS.getSheetByName('RESULT');
+
+  let targetData = [
+    // header
+    [
+      ...Object.keys(sourceDataColumn),
+      'HITUNGAN DISKOP',
+      'SELISIH',
+      'STATUS',
+      'KET',
+    ],
+  ];
   let targetSheet = activeSS.getSheetByName(month);
+
   if (!targetSheet) {
     targetSheet = activeSS.insertSheet(month);
   }
 
-  const resultSheet = activeSS.getSheetByName('RESULT');
-
-  const sourceData = sourceSheet.getDataRange().getValues();
-  const sourceDataHeader = sourceData[INDEX_HEADER] || [];
-  const sourceDataColumn = remapDataColumn(sourceDataHeader, month);
-
-  const PROCESSED_HEADER = [
-    ...Object.values(HEADER_MAPPING),
-    'TOTAL BUNGA DIBAYAR',
-    'HITUNGAN BPR',
-    'HITUNGAN DISKOP',
-    'SELISIH',
-    'STATUS',
-    'KET',
-  ];
-  const INDEX_DATA_END = sourceData.length - 1; // Last row with data (exclude total/subsidi if exist)
-
-  for (let i = 0; i < sourceData.length; i++) {
-    // Extend all data rows to match header length
-    while (sourceData[i].length < PROCESSED_HEADER.length) {
-      sourceData[i].push('');
-    }
-
-    // Skip header rows
-    if (i < INDEX_DATA_START) continue;
-    if (i >= INDEX_DATA_END) continue;
-
+  for (let i = INDEX_DATA_START; i < sourceData.length - 1; i++) {
     const row = sourceData[i];
     const notes = [];
 
@@ -148,26 +119,40 @@ function verifTagihan(month = 'JANUARI') {
 
     // TODO: remove this, temporary calc. total bunga dibayar
     const calcBPR = row[sourceDataColumn['HITUNGAN BPR']];
-    const totalRatePaid = calcBPR / 0.0925;
-    sourceData[i][sourceDataColumn['TOTAL BUNGA DIBAYAR']] = totalRatePaid;
+    const calcRatePaid = calcBPR / 0.0925;
 
     // 1. calc. hitungan diskop
-    const calcDiskop = totalRatePaid * 0.0925;
+    const calcDiskop = calcRatePaid * 0.0925;
 
     // 2. check overDue
-    const paidMonth = MONTH_MAPPED[month.toUpperCase()];
+    const paidMonth = MONTH_MAPPED[monthUpper];
+    const paidMonthIndex = paidMonth - 1; // zero-based index for month comparison
     const paidYear = DEFAULT_PERIOD_YEAR;
 
-    const dateDue = new Date(row[sourceDataColumn['JATUH TEMPO']]);
+    const dateStart = parseDate(row[sourceDataColumn['MULAI']]);
+    const dateDue = parseDate(row[sourceDataColumn['JATUH TEMPO']]);
+
     const dateDueMonth = dateDue.getMonth();
     const dateDueYear = dateDue.getFullYear();
 
-    const isOverDueYear = paidYear > dateDueYear;
-    const isOverDueMonth =
-      paidYear == dateDueYear && paidMonth - 1 > dateDueMonth;
+    let isOverDueYear = paidYear > dateDueYear;
+    let isOverDueMonth = false;
+
+    // because installment have grace period until the end of the month, we consider it overdue if paid month is more than 1 month after due month
+    if (paidYear == dateDueYear && paidMonthIndex > dateDueMonth + 1) {
+      isOverDueMonth = true;
+    }
+    // special case: if due date is in December and paid month is January next year, it's not overdue
+    if (isOverDueYear && dateDueMonth == 11 && paidMonthIndex == 0) {
+      isOverDueYear = false;
+      isOverDueMonth = false;
+    }
+
     if (isOverDueYear || isOverDueMonth) {
       verifChecklist.hasOverDue = true;
-      notes.push(`overdue`);
+      notes.push(
+        `overdue ${paidMonthIndex}/${paidYear} : ${dateDueMonth}/${dateDueYear}. ${dateDue.toLocaleDateString('id-ID')}`,
+      );
     }
 
     // 3. check differentiate, add status valid/invalid
@@ -184,29 +169,49 @@ function verifTagihan(month = 'JANUARI') {
     verifChecklist.totalDebitur = verifChecklist.totalDebitur + 1;
     verifChecklist.totalSubsidi = verifChecklist.totalSubsidi + calcBPR;
 
-    sourceData[i][sourceDataColumn['HITUNGAN DISKOP']] = calcDiskop;
-    sourceData[i][sourceDataColumn['SELISIH']] = calcDiff;
-    sourceData[i][sourceDataColumn['STATUS']] = notes.join(', ');
+    targetData.push([
+      row[sourceDataColumn['NO LOAN']], // 'NO LOAN'
+      row[sourceDataColumn['TIPE LOAN']], // 'TIPE LOAN'
+      row[sourceDataColumn['CABANG']], // 'CABANG'
+      row[sourceDataColumn['NO PK']], // 'NO PK'
+      row[sourceDataColumn['NAMA']], // 'NAMA'
+      row[sourceDataColumn['ALAMAT']], // 'ALAMAT'
+      row[sourceDataColumn['USAHA']], // 'USAHA'
+      dateStart, // 'MULAI'
+      dateDue, // 'JATUH TEMPO'
+      row[sourceDataColumn['JANGKA WAKTU']], // 'JANGKA WAKTU'
+      parseNumber(row[sourceDataColumn['PLAFOND']]), // 'PLAFOND'
+      parseNumber(row[sourceDataColumn['TOTAL SUBSIDI']]), // 'TOTAL SUBSIDI'
+      parseNumber(row[sourceDataColumn['SISA KREDIT']]), // 'SISA KREDIT'
+      parseNumber(row[sourceDataColumn['TUNGGAKAN POKOK']]), // 'TUNGGAKAN POKOK'
+      parseNumber(row[sourceDataColumn['TUNGGAKAN BUNGA']]), // 'TUNGGAKAN BUNGA'
+      String(row[sourceDataColumn['KOLEKTIBILITAS']] || '').toUpperCase(), // 'KOLEKTIBILITAS'
+
+      // TODO: remove this, temporary calc. total bunga dibayar
+      // row[sourceDataColumn['TOTAL BUNGA DIBAYAR']], // 'TOTAL BUNGA DIBAYAR'
+      calcRatePaid, // 'TOTAL BUNGA DIBAYAR'
+
+      parseNumber(row[sourceDataColumn['HITUNGAN BPR']]), // 'HITUNGAN BPR'
+      calcDiskop, // 'HITUNGAN DISKOP'
+      calcDiff, // 'SELISIH'
+      notes.join(', '), // 'STATUS'
+      '', // 'KET'
+    ]);
   }
 
-  const processedData = [
-    // header
-    PROCESSED_HEADER,
-    // data
-    ...sourceData.slice(INDEX_DATA_START, INDEX_DATA_END),
-  ];
+  targetSheet.clearContents();
 
   targetSheet
-    .getRange(1, 1, processedData.length, processedData[0].length)
-    .setValues(processedData);
+    .getRange(1, 1, targetData.length, targetData[0].length)
+    .setValues(targetData);
 
   const timestamp = Utilities.formatDate(
     new Date(),
-    activeSS.getSpreadsheetTimeZone(),
+    'Asia/Jakarta',
     'dd/MM/yyyy HH:mm:ss',
   );
   resultSheet.getRange(1, 3).setValue(timestamp);
-  resultSheet.getRange(2, 3).setValue(month);
+  resultSheet.getRange(2, 3).setValue(monthUpper);
 
   sheetsVerified.add(month);
 
@@ -216,7 +221,7 @@ function verifTagihan(month = 'JANUARI') {
     JSON.stringify({
       ...verifChecklist,
       verifiedAt: timestamp,
-      verifiedMonth: month,
+      verifiedMonth: monthUpper,
     }),
   );
 
