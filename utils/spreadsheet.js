@@ -1,10 +1,27 @@
+function _getColumnIndex(header) {
+  return {
+    'NO LOAN': header.indexOf('NO LOAN'),
+    NAMA: header.indexOf('NAMA'),
+    MULAI: header.indexOf('MULAI'),
+    'JATUH TEMPO': header.indexOf('JATUH TEMPO'),
+    PLAFOND: header.indexOf('PLAFOND'),
+    'JANGKA WAKTU': header.indexOf('JANGKA WAKTU'),
+    'TOTAL SUBSIDI BUNGA': header.indexOf('TOTAL SUBSIDI BUNGA'),
+    'TOTAL SUBSIDI DITERIMA': header.indexOf('TOTAL SUBSIDI DITERIMA'),
+    'SISA KREDIT': header.indexOf('SISA KREDIT'),
+    'HITUNGAN DISKOP': header.indexOf('TUNGGAKAN BUNGA') + 1,
+    KOLEKTIBILITAS: header.indexOf('KOLEKTIBILITAS'),
+    KET: header.indexOf('KET'),
+  };
+}
+
 /**
  * Build mapped column indices for data processing
  * @param {Object} sourceDataHeader - Map of column names to indices
  * @param {string} month - Month for Tagihan Bulan lookup
  * @returns {Object} mappedColumn with all column indices
  */
-function remapDataColumn(sourceDataHeader, month) {
+function _remapColumnIndex(sourceDataHeader, month) {
   const columnTotalBungaDibayar = `Tagihan Bulan ${month.slice(0, 1).toUpperCase() + month.slice(1).toLowerCase()}`;
 
   // Build source column indices

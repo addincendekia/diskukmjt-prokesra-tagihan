@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
+    <script src="//unpkg.com/alpinejs" defer></script>
+</head>
+
+<body class="position-relative">
+    <div x-data="dialog" x-init="focusCurrentSchedule()">
+        <div class="d-flex w-100">
+            <div class="w-50 mb-2">
+                <label for="plafond" class="d-block fw-bold">Plafond</label>
+                <input type="text" readonly class="form-control-plaintext pt-0" id="plafond"
+                    x-bind:value="formatNumber(debitur.plafond)">
+            </div>
+
+            <div class="w-50 mb-2">
+                <label for="tenor" class="d-block fw-bold">Jangka Waktu</label>
+                <input type="text" readonly class="form-control-plaintext pt-0" id="tenor" x-bind:value="debitur.tenor">
+            </div>
+        </div>
+
+        <div class="d-flex w-100">
+            <div class="w-50 mb-2">
+                <label for="dateReal" class="d-block fw-bold">Mulai</label>
+                <input type="text" readonly class="form-control-plaintext pt-0" id="dateReal"
+                    x-bind:value="debitur.dateReal">
+            </div>
+
+            <div class="w-50 mb-2">
+                <label for="dateEnd" class="d-block fw-bold">Jatuh Tempo</label>
+                <input type="text" readonly class="form-control-plaintext pt-0" id="dateEnd"
+                    x-bind:value="debitur.dateEnd">
+            </div>
+        </div>
+
+        <table class="table table-hover">
+            <thead class="sticky-top">
+                <tr>
+                    <th scope="col">Ang. Ke</th>
+                    <th scope="col">Ang. Pokok</th>
+                    <th scope="col">Ang. Bunga</th>
+                    <th scope="col">Sisa Pokok</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="installment in schedule" :key="installment.installment">
+                    <tr :data-installment="installment.installment" :class="{
+                  'sticky-top table-warning': installment.installment == scheduleInstallment.installment,
+                  'table-info': installment.installment == scheduleInstallment.installment - 1,
+                }" :style="installment.installment == scheduleInstallment.installment ? 'top: 40.5px' : ''">
+                        <th scope="row"
+                            :class="{ 'position-relative': installment.installment == scheduleInstallment.installment }">
+                            <span x-text="installment.installment"></span>
+                            <template x-if="installment.installment == scheduleInstallment.installment">
+                                <span class="badge bg-warning position-absolute top-0 translate-middle"
+                                    style="left: 60%;">next installment</span>
+                            </template>
+                        </th>
+                        <td x-text="formatNumber(installment.principalPayment.toFixed(2))"></td>
+                        <td class="text-end" x-text="formatNumber(installment.paymentInterest.toFixed(2))"></td>
+                        <td class="text-end" x-text="formatNumber(installment.principalRemaining.toFixed(2))"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('dialog', () => {
+                const debitur = JSON.parse('<?!= props.debitur ?>' || '{}');
+                const schedule = JSON.parse('<?!= props.schedule ?>' || '[]');
+                const scheduleInstallment = JSON.parse('<?!= props.scheduleInstallment ?>' || '{}');
+
+                return {
+                    isLoading: false,
+
+                    debitur,
+                    schedule,
+                    scheduleInstallment,
+                    formatNumber(value, style = 'decimal') {
+                        const formatter = new Intl.NumberFormat('id-ID', {
+                            style,
+                            currency: 'IDR',
+                        });
+
+                        return formatter.format(Number(value));
+                    },
+                    focusCurrentSchedule() {
+                        this.$nextTick(() => {
+                            const installment = this.scheduleInstallment?.installment;
+                            if (!installment) return;
+
+                            const selectedRow = document.querySelector(
+                                `tbody tr[data-installment="${installment - 1}"]`,
+                            );
+                            if (selectedRow) {
+                                selectedRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                            }
+                        });
+                    },
+                }
+            })
+        })
+    </script>
+</body>
+
+</html>

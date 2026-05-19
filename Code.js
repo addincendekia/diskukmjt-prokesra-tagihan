@@ -1,6 +1,7 @@
 const FILE_ID_SOURCE = '165qo3-b5p-2UKDKtnPOukuUPRokPyV7yac6QwGk3FNs';
 
 const DEFAULT_PERIOD_YEAR = 2026;
+const DEFAULT_RATE_SUBSIDI = 0.0925;
 
 const DEFAULT_RESULT = {
   verifiedAt: null,
@@ -32,6 +33,7 @@ function onOpen() {
     .createMenu('📊 Rekon Tools')
     .addItem('Verif Tagihan', 'dialogVerif')
     .addItem('Verif Terakhir', 'dialogVerifResult')
+    .addItem('Lihat Riwayat Debitur', 'dialogDebtorHistory')
     .addItem('Lihat Rekapitulasi', 'navigateToRekapitulasi')
     .addToUi();
 }
@@ -73,6 +75,57 @@ function dialogVerifResult() {
   );
 }
 
+function dialogDebtorHistory() {
+  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
+  const activeSheet = activeSS.getActiveSheet();
+  const activeRange = activeSheet.getActiveRange();
+
+  if (!activeRange) return;
+
+  const dataHeader = activeSheet
+    .getRange(1, 1, 1, activeSheet.getLastColumn())
+    .getValues()[0];
+
+  const dataColumn = _getColumnIndex(dataHeader);
+
+  const rowSelected = activeRange.getRow();
+  const rowData = activeSheet
+    .getRange(rowSelected, 1, 1, activeSheet.getLastColumn())
+    .getValues()[0];
+
+  const { debitur, debiturSchedule, debiturInstallment } =
+    _simulateTagihanDebitur(rowData, dataColumn, activeSheet.getName());
+
+  const html = HtmlService.createTemplateFromFile('ui/DialogDebtorHistory');
+  html.props = {
+    debitur: JSON.stringify({
+      cabang: debitur[dataColumn['CABANG']],
+      noLoan: debitur[dataColumn['NO LOAN']],
+      nama: debitur[dataColumn['NAMA']],
+      plafond: debitur[dataColumn['PLAFOND']],
+      tenor: debitur[dataColumn['JANGKA WAKTU']],
+      interestTotal: debiturSchedule.interestTotal,
+      dateReal: Utilities.formatDate(
+        new Date(debitur[dataColumn['MULAI']]),
+        Session.getScriptTimeZone(),
+        'dd, MMM yyyy',
+      ),
+      dateEnd: Utilities.formatDate(
+        new Date(debitur[dataColumn['JATUH TEMPO']]),
+        Session.getScriptTimeZone(),
+        'dd, MMM yyyy',
+      ),
+    }),
+    schedule: JSON.stringify(debiturSchedule.schedule),
+    scheduleInstallment: JSON.stringify(debiturInstallment),
+  };
+
+  SpreadsheetApp.getUi().showModalDialog(
+    html.evaluate().setWidth(450).setHeight(350),
+    `Riwayat Tagihan ${debitur[dataColumn['NAMA']]}`,
+  );
+}
+
 function verifTagihan(month = 'JANUARI') {
   const monthUpper = month.toUpperCase();
   const INDEX_HEADER = 4;
@@ -90,7 +143,7 @@ function verifTagihan(month = 'JANUARI') {
 
   const sourceData = sourceSheet.getDataRange().getValues();
   const sourceDataHeader = sourceData[INDEX_HEADER] || [];
-  const sourceDataColumn = remapDataColumn(sourceDataHeader, monthUpper);
+  const sourceDataColumn = _remapColumnIndex(sourceDataHeader, monthUpper);
 
   const activeSS = SpreadsheetApp.getActiveSpreadsheet();
   const resultSheet = activeSS.getSheetByName('RESULT');
