@@ -1,67 +1,111 @@
-function getInstallmentDebitur({ fileSource, noLoan, plafond }) {
+function _checkInstallmentOverdue({ paidMonth, columnDateDue }) {
+  const paidMonthIndex = paidMonth - 1; // zero-based index for month comparison
+  const paidYear = DEFAULT_PERIOD_YEAR;
+
+  const dateDue = parseDate(columnDateDue);
+  const dateDueMonth = dateDue.getMonth();
+  const dateDueYear = dateDue.getFullYear();
+
+  let isOverDueYear = paidYear > dateDueYear;
+  let isOverDueMonth = false;
+
+  // because installment have grace period until the end of the month, we consider it overdue if paid month is more than 1 month after due month
+  if (paidYear == dateDueYear && paidMonthIndex > dateDueMonth + 1) {
+    isOverDueMonth = true;
+  }
+  // special case: if due date is in December and paid month is January next year, it's not overdue
+  if (isOverDueYear && dateDueMonth == 11 && paidMonthIndex == 0) {
+    isOverDueYear = false;
+    isOverDueMonth = false;
+  }
+
+  return isOverDueYear || isOverDueMonth;
+}
+
+function _getInstallmentDebitur({ fileSource, noLoan }) {
   const sourceSS = SpreadsheetApp.openById(fileSource);
 
   // Get all sheet names except 'RESULT'
-  const months = sourceSS
+  const sourceMonths = sourceSS
     .getSheets()
     .map((sheet) => sheet.getName())
     .filter((name) => name !== 'RESULT');
 
+  const sourceSheetResult = sourceSS.getSheetByName('RESULT');
+  const sourceYear = sourceSheetResult.getRange(2, 5).getValue();
+
+  const sourceSheet = sourceSS.getSheetByName(sourceMonths[0]);
+  const sourceData = sourceSheet ? sourceSheet.getDataRange().getValues() : [];
+  const sourceDataHeader = sourceData[0] || [];
+
+  const sourceDataColumn = _getColumnIndex(sourceDataHeader);
+
   const results = [];
-  let remainingBalance = plafond;
 
-  const MONTH_DEBITUR_COL = 1;
-  const MONTH_INSTALLMENT_COL = 2;
+  sourceMonths.forEach((monthName, monthIndex) => {
+    let rowId = null; // Step 1: Default to null if not found
+    let rowLink = null;
+    let row = [];
 
-  months.forEach((monthName) => {
-    const sheet = sourceSS.getSheetByName(monthName);
-    if (!sheet) return;
+    const monthSheet = sourceSS.getSheetByName(monthName);
+    if (!monthSheet) return;
 
-    const lastRow = sheet.getLastRow();
-    let installment = 0;
-    let targetRow = null; // Step 1: Default to null if not found
+    const monthSheetId = monthSheet.getSheetId();
 
-    if (lastRow > 0) {
-      const searchRange = sheet.getRange(1, MONTH_DEBITUR_COL, lastRow, 1);
-      const cell = searchRange
+    const rowEnd = monthSheet.getLastRow();
+    if (rowEnd > 0) {
+      const columnNoLoan = sourceDataColumn['NO LOAN'];
+      if (columnNoLoan == null || columnNoLoan < 0) {
+        throw new Error('NO LOAN column not found in source header');
+      }
+
+      const columnNoLoans = monthSheet.getRange(1, columnNoLoan + 1, rowEnd, 1);
+
+      const columnMatch = columnNoLoans
         .createTextFinder(noLoan)
         .matchEntireCell(true)
         .findNext();
 
-      if (cell) {
-        targetRow = cell.getRow(); // Step 2: Grab the exact row number (e.g., 452)
-        installment =
-          sheet.getRange(targetRow, MONTH_INSTALLMENT_COL).getValue() || 0;
+      if (columnMatch) {
+        rowId = columnMatch.getRow(); // Step 2: Grab the exact row number (e.g., 452)
+        rowLink = _getInstallmentUrl({
+          fileId: fileSource,
+          sheetId: monthSheetId,
+          rowId,
+        });
+
+        row = monthSheet
+          .getRange(rowId, 1, 1, monthSheet.getLastColumn())
+          .getValues()[0];
       }
     }
 
-    remainingBalance -= installment;
+    if (rowId === null) return;
 
     results.push({
-      month: monthName.toUpperCase(),
-      installment: installment,
-      rest: remainingBalance,
-      sheetName: monthName,
-      row: targetRow, // Step 3: Package the row number into the data sent to HTML
+      row: rowId, // Step 3: Package the row number into the data sent to HTML,
+      rowLink,
+      installment: String(monthIndex + 1).padStart(2, '0') + '/' + sourceYear,
+
+      principalBefore: row[sourceDataColumn['SISA KREDIT']] || 0,
+
+      principalPayment: null,
+      principalRemaining: null,
+
+      paymentInterest: row[sourceDataColumn['HITUNGAN BPR']] || 0,
     });
   });
 
   return results;
 }
 
-// // Step 4: Enhanced navigation function to jump to the exact row
-// function jumpToSheetAndRow(sheetName, rowNumber) {
-//   const ss = SpreadsheetApp.getActiveSpreadsheet();
-//   const sheet = ss.getSheetByName(sheetName);
+// 'D5027123', T1003503
+function _getInstallmentUrl({ fileId, sheetId, rowId }) {
+  const row = Number(rowId);
+  if (!Number.isInteger(row) || row < 1) {
+    throw new Error(`Invalid row number: ${rowId}`);
+  }
 
-//   if (sheet && rowNumber) {
-//     // 1. Switch to the correct monthly sheet
-//     ss.setActiveSheet(sheet);
-
-//     // 2. Target the specific row (Column 1 / Column A)
-//     const targetCell = sheet.getRange(rowNumber, 1);
-
-//     // 3. Jump the viewport/cursor to that exact cell
-//     sheet.setActiveRange(targetCell);
-//   }
-// }
+  const url = `https://docs.google.com/spreadsheets/d/${fileId}/edit?gid=${sheetId}#gid=${sheetId}&range=${row}:${row}`;
+  return url;
+}

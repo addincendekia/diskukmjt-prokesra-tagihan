@@ -9,6 +9,7 @@ function _getColumnIndex(header) {
     'TOTAL SUBSIDI BUNGA': header.indexOf('TOTAL SUBSIDI BUNGA'),
     'TOTAL SUBSIDI DITERIMA': header.indexOf('TOTAL SUBSIDI DITERIMA'),
     'SISA KREDIT': header.indexOf('SISA KREDIT'),
+    'HITUNGAN BPR': header.indexOf('HITUNGAN BPR'),
     'HITUNGAN DISKOP': header.indexOf('TUNGGAKAN BUNGA') + 1,
     KOLEKTIBILITAS: header.indexOf('KOLEKTIBILITAS'),
     KET: header.indexOf('KET'),

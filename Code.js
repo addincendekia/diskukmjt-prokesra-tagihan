@@ -96,6 +96,14 @@ function dialogDebtorHistory() {
   const { debitur, debiturSchedule, debiturInstallment } =
     _simulateTagihanDebitur(rowData, dataColumn, activeSheet.getName());
 
+  const schedule = debiturSchedule.schedule;
+
+  const SOURCE_TAGIHAN_2025 = '19Fa9-RAMW2gEZz0KmVoM-Ls0qLDEyYK8L0USyezM0QI';
+  const getDebiturInstallment = _getInstallmentDebitur({
+    fileSource: SOURCE_TAGIHAN_2025,
+    noLoan: debitur[dataColumn['NO LOAN']],
+  });
+
   const html = HtmlService.createTemplateFromFile('ui/DialogDebtorHistory');
   html.props = {
     debitur: JSON.stringify({
