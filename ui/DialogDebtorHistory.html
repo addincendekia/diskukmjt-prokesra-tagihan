@@ -46,7 +46,7 @@
             <thead class="sticky-top">
                 <tr>
                     <th scope="col">Ang. Ke</th>
-                    <th scope="col">Ang. Pokok</th>
+                    <!-- <th scope="col">Ang. Pokok</th> -->
                     <th scope="col">Ang. Bunga</th>
                     <th scope="col">Sisa Pokok</th>
                 </tr>
@@ -59,13 +59,19 @@
                 }" :style="installment.installment == scheduleInstallment.installment ? 'top: 40.5px' : ''">
                         <th scope="row"
                             :class="{ 'position-relative': installment.installment == scheduleInstallment.installment }">
-                            <span x-text="installment.installment"></span>
+                            <template x-if="installment.rowLink">
+                                <a :href="installment.rowLink" target="_blank" rel="noopener noreferrer"
+                                    x-text="installment.installment"></a>
+                            </template>
+                            <template x-if="!installment.rowLink">
+                                <span x-text="installment.installment"></span>
+                            </template>
                             <template x-if="installment.installment == scheduleInstallment.installment">
                                 <span class="badge bg-warning position-absolute top-0 translate-middle"
                                     style="left: 60%;">next installment</span>
                             </template>
                         </th>
-                        <td x-text="formatNumber(installment.principalPayment.toFixed(2))"></td>
+                        <!-- <td x-text="formatNumber(installment.principalPayment.toFixed(2))"></td> -->
                         <td class="text-end" x-text="formatNumber(installment.paymentInterest.toFixed(2))"></td>
                         <td class="text-end" x-text="formatNumber(installment.principalRemaining.toFixed(2))"></td>
                     </tr>

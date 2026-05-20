@@ -96,13 +96,48 @@ function dialogDebtorHistory() {
   const { debitur, debiturSchedule, debiturInstallment } =
     _simulateTagihanDebitur(rowData, dataColumn, activeSheet.getName());
 
-  const schedule = debiturSchedule.schedule;
+  const dateReal = parseDate(debitur[dataColumn['MULAI']], 'dd/MM/yyyy', false);
+  const dateRealYear = dateReal.getFullYear();
 
-  const SOURCE_TAGIHAN_2025 = '19Fa9-RAMW2gEZz0KmVoM-Ls0qLDEyYK8L0USyezM0QI';
-  const getDebiturInstallment = _getInstallmentDebitur({
-    fileSource: SOURCE_TAGIHAN_2025,
-    noLoan: debitur[dataColumn['NO LOAN']],
-  });
+  const dateEnd = parseDate(
+    debitur[dataColumn['JATUH TEMPO']],
+    'dd/MM/yyyy',
+    false,
+  );
+  const dateEndYear = dateEnd.getFullYear();
+
+  let debiturScheduleRealization = [];
+  if (dateRealYear < DEFAULT_PERIOD_YEAR) {
+    // get realization 2025
+    debiturScheduleRealization = [
+      ...debiturScheduleRealization,
+      ..._getInstallmentDebitur({
+        fileSource: '19Fa9-RAMW2gEZz0KmVoM-Ls0qLDEyYK8L0USyezM0QI',
+        noLoan: debitur[dataColumn['NO LOAN']],
+      }),
+    ];
+  }
+
+  // get realization 2026
+  if (dateEndYear >= DEFAULT_PERIOD_YEAR) {
+    debiturScheduleRealization = [
+      ...debiturScheduleRealization,
+      ..._getInstallmentDebitur({
+        fileSource: activeSS.getId(),
+        noLoan: debitur[dataColumn['NO LOAN']],
+      }),
+    ];
+  }
+
+  const schedule = [
+    ...debiturScheduleRealization,
+    // ...debiturSchedule.schedule.filter(({ installment }) => {
+    //   return (
+    //     installment == debiturInstallment.installment - 1 ||
+    //     installment == debiturInstallment.installment
+    //   );
+    // }),
+  ];
 
   const html = HtmlService.createTemplateFromFile('ui/DialogDebtorHistory');
   html.props = {
@@ -124,7 +159,7 @@ function dialogDebtorHistory() {
         'dd, MMM yyyy',
       ),
     }),
-    schedule: JSON.stringify(debiturSchedule.schedule),
+    schedule: JSON.stringify(schedule),
     scheduleInstallment: JSON.stringify(debiturInstallment),
   };
 
@@ -186,34 +221,14 @@ function verifTagihan(month = 'JANUARI') {
     const calcDiskop = calcRatePaid * 0.0925;
 
     // 2. check overDue
-    const paidMonth = MONTH_MAPPED[monthUpper];
-    const paidMonthIndex = paidMonth - 1; // zero-based index for month comparison
-    const paidYear = DEFAULT_PERIOD_YEAR;
+    const respInstallmentOverDue = _checkInstallmentOverdue({
+      paidMonth: MONTH_MAPPED[monthUpper],
+      columnDateDue: row[sourceDataColumn['JATUH TEMPO']],
+    });
 
-    const dateStart = parseDate(row[sourceDataColumn['MULAI']]);
-    const dateDue = parseDate(row[sourceDataColumn['JATUH TEMPO']]);
-
-    const dateDueMonth = dateDue.getMonth();
-    const dateDueYear = dateDue.getFullYear();
-
-    let isOverDueYear = paidYear > dateDueYear;
-    let isOverDueMonth = false;
-
-    // because installment have grace period until the end of the month, we consider it overdue if paid month is more than 1 month after due month
-    if (paidYear == dateDueYear && paidMonthIndex > dateDueMonth + 1) {
-      isOverDueMonth = true;
-    }
-    // special case: if due date is in December and paid month is January next year, it's not overdue
-    if (isOverDueYear && dateDueMonth == 11 && paidMonthIndex == 0) {
-      isOverDueYear = false;
-      isOverDueMonth = false;
-    }
-
-    if (isOverDueYear || isOverDueMonth) {
+    if (!!respInstallmentOverDue) {
       verifChecklist.hasOverDue = true;
-      notes.push(
-        `overdue ${paidMonthIndex}/${paidYear} : ${dateDueMonth}/${dateDueYear}. ${dateDue.toLocaleDateString('id-ID')}`,
-      );
+      notes.push(respInstallmentOverDue);
     }
 
     // 3. check differentiate, add status valid/invalid
@@ -238,8 +253,8 @@ function verifTagihan(month = 'JANUARI') {
       row[sourceDataColumn['NAMA']], // 'NAMA'
       row[sourceDataColumn['ALAMAT']], // 'ALAMAT'
       row[sourceDataColumn['USAHA']], // 'USAHA'
-      dateStart, // 'MULAI'
-      dateDue, // 'JATUH TEMPO'
+      parseDate(row[sourceDataColumn['MULAI']]), // 'MULAI'
+      parseDate(row[sourceDataColumn['JATUH TEMPO']]), // 'JATUH TEMPO'
       row[sourceDataColumn['JANGKA WAKTU']], // 'JANGKA WAKTU'
       parseNumber(row[sourceDataColumn['PLAFOND']]), // 'PLAFOND'
       parseNumber(row[sourceDataColumn['TOTAL SUBSIDI']]), // 'TOTAL SUBSIDI'

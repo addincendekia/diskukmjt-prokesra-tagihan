@@ -6,6 +6,7 @@ function _checkInstallmentOverdue({ paidMonth, columnDateDue }) {
   const dateDueMonth = dateDue.getMonth();
   const dateDueYear = dateDue.getFullYear();
 
+  let message = '';
   let isOverDueYear = paidYear > dateDueYear;
   let isOverDueMonth = false;
 
@@ -19,7 +20,11 @@ function _checkInstallmentOverdue({ paidMonth, columnDateDue }) {
     isOverDueMonth = false;
   }
 
-  return isOverDueYear || isOverDueMonth;
+  if (isOverDueYear || isOverDueMonth) {
+    message = `overdue ${paidMonthIndex}/${paidYear} : ${dateDueMonth}/${dateDueYear}. ${dateDue.toLocaleDateString('id-ID')}`;
+  }
+
+  return message;
 }
 
 function _getInstallmentDebitur({ fileSource, noLoan }) {
@@ -90,7 +95,7 @@ function _getInstallmentDebitur({ fileSource, noLoan }) {
       principalBefore: row[sourceDataColumn['SISA KREDIT']] || 0,
 
       principalPayment: null,
-      principalRemaining: null,
+      principalRemaining: row[sourceDataColumn['SISA KREDIT']] || 0, // TODO: temporary, should be calculated based on payment history
 
       paymentInterest: row[sourceDataColumn['HITUNGAN BPR']] || 0,
     });
