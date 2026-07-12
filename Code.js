@@ -1,7 +1,17 @@
-const FILE_ID_SOURCE = '165qo3-b5p-2UKDKtnPOukuUPRokPyV7yac6QwGk3FNs';
+let FILE_ID_SOURCE = '1NyKmiPDO68ZeqFUS8d1xJZ1dbY0JKvP8bixbcYEC9cQ';
+let FILE_ID_SOURCE_2025 = '19Fa9-RAMW2gEZz0KmVoM-Ls0qLDEyYK8L0USyezM0QI';
+let FILE_ID_REKAPITULASI = '1JSvQXVhC6InSpULihdoxNGrIjsoZ5V7OplV5CptWc_c';
 
-const DEFAULT_PERIOD_YEAR = 2026;
-const DEFAULT_RATE_SUBSIDI = 0.0925;
+let DEFAULT_PERIOD_YEAR = 2026;
+let DEFAULT_RATE_SUBSIDI = 0.0925;
+
+const PROPERTY_KEYS = {
+  FILE_ID_SOURCE: 'config.fileSourceId',
+  FILE_ID_SOURCE_2025: 'config.fileSourceId2025',
+  FILE_ID_REKAPITULASI: 'config.fileSourceIdRekapitulasi',
+  DEFAULT_PERIOD_YEAR: 'config.defaultPeriodYear',
+  DEFAULT_RATE_SUBSIDI: 'config.defaultRateSubsidi',
+};
 
 const DEFAULT_RESULT = {
   verifiedAt: null,
@@ -28,6 +38,8 @@ const MONTH_MAPPED = {
   DESEMBER: 12,
 };
 
+_getAppConfig();
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📊 Rekon Tools')
@@ -35,7 +47,27 @@ function onOpen() {
     .addItem('Verif Terakhir', 'dialogVerifResult')
     .addItem('Lihat Riwayat Debitur', 'dialogDebtorHistory')
     .addItem('Lihat Rekapitulasi', 'navigateToRekapitulasi')
+    .addItem('Pengaturan', 'dialogAppConfig')
     .addToUi();
+}
+
+// load ui
+function dialogAppConfig() {
+  const config = _getAppConfig();
+
+  const html = HtmlService.createTemplateFromFile('ui/DialogAppConfig');
+  html.props = {
+    fileSourceId: config.fileSourceId,
+    fileSourceId2025: config.fileSourceId2025,
+    fileSourceIdRekapitulasi: config.fileSourceIdRekapitulasi,
+    defaultPeriodYear: config.defaultPeriodYear,
+    defaultRateSubsidi: config.defaultRateSubsidi,
+  };
+
+  SpreadsheetApp.getUi().showModalDialog(
+    html.evaluate().setWidth(500).setHeight(420),
+    'Pengaturan Aplikasi',
+  );
 }
 
 function dialogVerif() {
@@ -76,6 +108,8 @@ function dialogVerifResult() {
 }
 
 function dialogDebtorHistory() {
+  _getAppConfig();
+
   const activeSS = SpreadsheetApp.getActiveSpreadsheet();
   const activeSheet = activeSS.getActiveSheet();
   const activeRange = activeSheet.getActiveRange();
@@ -112,7 +146,7 @@ function dialogDebtorHistory() {
     debiturScheduleRealization = [
       ...debiturScheduleRealization,
       ..._getInstallmentDebitur({
-        fileSource: '19Fa9-RAMW2gEZz0KmVoM-Ls0qLDEyYK8L0USyezM0QI',
+        fileSource: FILE_ID_SOURCE_2025,
         noLoan: debitur[dataColumn['NO LOAN']],
       }),
     ];
@@ -169,7 +203,10 @@ function dialogDebtorHistory() {
   );
 }
 
+// functions
 function verifTagihan(month = 'JANUARI') {
+  _getAppConfig();
+
   const monthUpper = month.toUpperCase();
   const INDEX_HEADER = 4;
   const INDEX_DATA_START = 7;
@@ -215,10 +252,13 @@ function verifTagihan(month = 'JANUARI') {
 
     // TODO: remove this, temporary calc. total bunga dibayar
     const calcBPR = row[sourceDataColumn['HITUNGAN BPR']];
-    const calcRatePaid = calcBPR / 0.0925;
+    // const calcRatePaid = calcBPR / 0.0925;
+    // // 1. calc. hitungan diskop
+    // const calcDiskop = calcRatePaid * 0.0925;
 
-    // 1. calc. hitungan diskop
-    const calcDiskop = calcRatePaid * 0.0925;
+    const calcRatePaid =
+      Number(row[sourceDataColumn['TOTAL BUNGA DIBAYAR']]) || 0;
+    const calcDiskop = (9.25 / 3) * calcRatePaid;
 
     // 2. check overDue
     const respInstallmentOverDue = _checkInstallmentOverdue({
@@ -330,8 +370,11 @@ function navigateToResult() {
 }
 
 function navigateToRekapitulasi() {
-  const url =
-    'https://docs.google.com/spreadsheets/d/1JSvQXVhC6InSpULihdoxNGrIjsoZ5V7OplV5CptWc_c';
+  _getAppConfig();
+
+  const url = FILE_ID_REKAPITULASI.includes('http')
+    ? FILE_ID_REKAPITULASI
+    : `https://docs.google.com/spreadsheets/d/${FILE_ID_REKAPITULASI}`;
 
   const html = HtmlService.createHtmlOutput(
     `
@@ -347,6 +390,44 @@ function navigateToRekapitulasi() {
     .setHeight(150);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Opening Rekapitulasi');
+}
+
+function saveAppConfig(formData) {
+  const props = PropertiesService.getScriptProperties();
+  const appConfig = {
+    fileSourceId: formData.fileSourceId || FILE_ID_SOURCE,
+    fileSourceId2025: formData.fileSourceId2025 || FILE_ID_SOURCE_2025,
+    fileSourceIdRekapitulasi:
+      formData.fileSourceIdRekapitulasi || FILE_ID_REKAPITULASI,
+    defaultPeriodYear: Number(
+      formData.defaultPeriodYear || DEFAULT_PERIOD_YEAR,
+    ),
+    defaultRateSubsidi: Number(
+      formData.defaultRateSubsidi || DEFAULT_RATE_SUBSIDI,
+    ),
+  };
+
+  props.setProperty(PROPERTY_KEYS.FILE_ID_SOURCE, appConfig.fileSourceId);
+  props.setProperty(
+    PROPERTY_KEYS.FILE_ID_SOURCE_2025,
+    appConfig.fileSourceId2025,
+  );
+  props.setProperty(
+    PROPERTY_KEYS.FILE_ID_REKAPITULASI,
+    appConfig.fileSourceIdRekapitulasi,
+  );
+  props.setProperty(
+    PROPERTY_KEYS.DEFAULT_PERIOD_YEAR,
+    String(appConfig.defaultPeriodYear),
+  );
+  props.setProperty(
+    PROPERTY_KEYS.DEFAULT_RATE_SUBSIDI,
+    String(appConfig.defaultRateSubsidi),
+  );
+
+  _getAppConfig();
+
+  return appConfig;
 }
 
 // const props = PropertiesService.getScriptProperties();

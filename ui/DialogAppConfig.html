@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous"
+    />
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+    </style>
+    <script src="//unpkg.com/alpinejs" defer></script>
+  </head>
+
+  <body class="p-3">
+    <div x-data="dialogAppConfig" x-cloak>
+      <form class="row g-3" @submit.prevent="save">
+        <div class="col-12">
+          <label for="fileSourceId" class="form-label fw-bold">File Source ID</label>
+          <input id="fileSourceId" class="form-control" x-model="form.fileSourceId" />
+          <div class="form-text">ID spreadsheet sumber tagihan utama.</div>
+        </div>
+
+        <div class="col-12">
+          <label for="fileSourceId2025" class="form-label fw-bold">File Source ID Tagihan Tahun 2025</label>
+          <input id="fileSourceId2025" class="form-control" x-model="form.fileSourceId2025" />
+          <div class="form-text">ID spreadsheet yang berisi data realisasi tagihan tahun 2025.</div>
+        </div>
+
+        <div class="col-12">
+          <label for="fileSourceIdRekapitulasi" class="form-label fw-bold">File Source ID Rekapitulasi</label>
+          <input id="fileSourceIdRekapitulasi" class="form-control" x-model="form.fileSourceIdRekapitulasi" />
+          <div class="form-text">ID spreadsheet atau URL rekapitulasi.</div>
+        </div>
+
+        <div class="col-12 col-md-6">
+          <label for="defaultPeriodYear" class="form-label fw-bold">Default Period</label>
+          <input id="defaultPeriodYear" type="number" class="form-control" x-model.number="form.defaultPeriodYear" />
+        </div>
+
+        <div class="col-12 col-md-6">
+          <label for="defaultRateSubsidi" class="form-label fw-bold">Default Rate Subsidi</label>
+          <input id="defaultRateSubsidi" type="number" step="0.0001" class="form-control" x-model.number="form.defaultRateSubsidi" />
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2 mt-2">
+          <button type="button" class="btn btn-outline-secondary" @click="close()">Batal</button>
+          <button type="submit" class="btn btn-primary" :disabled="isSaving">
+            <span x-show="isSaving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span x-text="isSaving ? 'Menyimpan...' : 'Simpan'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+      crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener('alpine:init', () => {
+        Alpine.data('dialogAppConfig', () => {
+          const initialConfig = JSON.parse('<?= JSON.stringify(props) ?>' || '{}');
+
+          return {
+            isSaving: false,
+            form: {
+              fileSourceId: initialConfig.fileSourceId || '',
+              fileSourceId2025: initialConfig.fileSourceId2025 || '',
+              fileSourceIdRekapitulasi: initialConfig.fileSourceIdRekapitulasi || '',
+              defaultPeriodYear: initialConfig.defaultPeriodYear || '',
+              defaultRateSubsidi: initialConfig.defaultRateSubsidi || '',
+            },
+            close() {
+              google.script.host.close();
+            },
+            save() {
+              this.isSaving = true;
+              google.script.run
+                .withSuccessHandler(() => {
+                  google.script.host.close();
+                })
+                .saveAppConfig(this.form);
+            },
+          };
+        });
+      });
+    </script>
+  </body>
+</html>
