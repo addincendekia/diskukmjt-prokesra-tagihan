@@ -250,8 +250,9 @@ function verifTagihan(month = 'JANUARI') {
 
     if (row[sourceDataColumn['HITUNGAN BPR']] == 0) continue;
 
-    // TODO: remove this, temporary calc. total bunga dibayar
     const calcBPR = row[sourceDataColumn['HITUNGAN BPR']];
+
+    // TODO: remove this, temporary calc. total bunga dibayar
     // const calcRatePaid = calcBPR / 0.0925;
     // // 1. calc. hitungan diskop
     // const calcDiskop = calcRatePaid * 0.0925;

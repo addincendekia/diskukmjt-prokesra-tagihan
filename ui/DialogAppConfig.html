@@ -19,32 +19,35 @@
   <body class="p-3">
     <div x-data="dialogAppConfig" x-cloak>
       <form class="row g-3" @submit.prevent="save">
+        <div class="col-12 col-md-6">
+          <label for="defaultPeriodYear" class="form-label fw-bold">Periode Tagihan</label>
+          <input id="defaultPeriodYear" type="number" class="form-control" x-model.number="form.defaultPeriodYear" />
+        </div>
+        
+        <div class="col-12 col-md-6">
+          <label for="defaultRateSubsidi" class="form-label fw-bold">Default Rate Subsidi</label>
+          <input id="defaultRateSubsidi" type="number" step="0.0001" class="form-control"
+            x-model.number="form.defaultRateSubsidi" readonly disabled />
+        </div>
+
         <div class="col-12">
-          <label for="fileSourceId" class="form-label fw-bold">File Source ID</label>
+          <label for="fileSourceId" class="form-label fw-bold">
+            File Tagihan <span class="text-muted" x-text="form.defaultPeriodYear"></span>
+          </label>
           <input id="fileSourceId" class="form-control" x-model="form.fileSourceId" />
           <div class="form-text">ID spreadsheet sumber tagihan utama.</div>
         </div>
 
         <div class="col-12">
-          <label for="fileSourceId2025" class="form-label fw-bold">File Source ID Tagihan Tahun 2025</label>
+          <label for="fileSourceId2025" class="form-label fw-bold">File Tagihan 2025</label>
           <input id="fileSourceId2025" class="form-control" x-model="form.fileSourceId2025" />
-          <div class="form-text">ID spreadsheet yang berisi data realisasi tagihan tahun 2025.</div>
+          <div class="form-text">ID spreadsheet yang realisasi tagihan 2025.</div>
         </div>
 
         <div class="col-12">
-          <label for="fileSourceIdRekapitulasi" class="form-label fw-bold">File Source ID Rekapitulasi</label>
+          <label for="fileSourceIdRekapitulasi" class="form-label fw-bold">File Rekapitulasi</label>
           <input id="fileSourceIdRekapitulasi" class="form-control" x-model="form.fileSourceIdRekapitulasi" />
           <div class="form-text">ID spreadsheet atau URL rekapitulasi.</div>
-        </div>
-
-        <div class="col-12 col-md-6">
-          <label for="defaultPeriodYear" class="form-label fw-bold">Default Period</label>
-          <input id="defaultPeriodYear" type="number" class="form-control" x-model.number="form.defaultPeriodYear" />
-        </div>
-
-        <div class="col-12 col-md-6">
-          <label for="defaultRateSubsidi" class="form-label fw-bold">Default Rate Subsidi</label>
-          <input id="defaultRateSubsidi" type="number" step="0.0001" class="form-control" x-model.number="form.defaultRateSubsidi" />
         </div>
 
         <div class="col-12 d-flex justify-content-end gap-2 mt-2">
