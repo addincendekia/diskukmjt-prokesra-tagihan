@@ -257,8 +257,11 @@ function verifTagihan(month = 'JANUARI') {
     // // 1. calc. hitungan diskop
     // const calcDiskop = calcRatePaid * 0.0925;
 
-    const calcRatePaid =
-      Number(row[sourceDataColumn['TOTAL BUNGA DIBAYAR']]) || 0;
+    let calcRatePaid = row[sourceDataColumn['TOTAL BUNGA DIBAYAR']]
+      .replace(/\.00$/, '')
+      .replace(/[^\d]/g, '');
+    calcRatePaid = Number(calcRatePaid) || 0;
+
     const calcDiskop = (9.25 / 3) * calcRatePaid;
 
     // 2. check overDue
