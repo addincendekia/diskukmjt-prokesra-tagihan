@@ -258,8 +258,9 @@ function verifTagihan(month = 'JANUARI') {
     // const calcDiskop = calcRatePaid * 0.0925;
 
     let calcRatePaid = row[sourceDataColumn['TOTAL BUNGA DIBAYAR']]
-      .replace(/\.00$/, '')
-      .replace(/[^\d]/g, '');
+      .replace(/\./g, '') // remove thousand separators
+      .replace(',', '.'); // convert decimal separator
+
     calcRatePaid = Number(calcRatePaid) || 0;
 
     const calcDiskop = (9.25 / 3) * calcRatePaid;
