@@ -19,6 +19,16 @@ function parseDate(value, format = 'dd/MM/yyyy', reverse = true) {
     valueFormatted = new Date(year, month, day).toLocaleDateString('en-GB');
   }
 
+  // If it's a String, and non standart date. ex: 03-08-23
+  if (typeof value === 'string' && value.includes('-') && value.length === 8) {
+    const valueParsed = value.split('-');
+    const day = valueParsed[0];
+    const month = valueParsed[1];
+    const year = `20${valueParsed[2]}`;
+
+    valueFormatted = new Date(year, month, day).toLocaleDateString('en-GB');
+  }
+
   return Utilities.parseDate(
     valueFormatted,
     Session.getScriptTimeZone(),

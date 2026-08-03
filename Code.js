@@ -204,7 +204,7 @@ function dialogDebtorHistory() {
 }
 
 // functions
-function verifTagihan(month = 'JANUARI') {
+function verifTagihan(month = 'Juli') {
   _getAppConfig();
 
   const monthUpper = month.toUpperCase();
@@ -257,9 +257,13 @@ function verifTagihan(month = 'JANUARI') {
     // // 1. calc. hitungan diskop
     // const calcDiskop = calcRatePaid * 0.0925;
 
-    let calcRatePaid = row[sourceDataColumn['TOTAL BUNGA DIBAYAR']]
-      .replace(/\./g, '') // remove thousand separators
-      .replace(',', '.'); // convert decimal separator
+    let calcRatePaid = row[sourceDataColumn['TOTAL BUNGA DIBAYAR']];
+
+    if (typeof calcRatePaid === 'string') {
+      calcRatePaid = row[sourceDataColumn['TOTAL BUNGA DIBAYAR']]
+        .replace(/\./g, '') // remove thousand separators
+        .replace(',', '.'); // convert decimal separator
+    }
 
     calcRatePaid = Number(calcRatePaid) || 0;
 

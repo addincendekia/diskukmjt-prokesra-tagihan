@@ -31,6 +31,12 @@ function _remapColumnIndex(sourceDataHeader, month) {
     column[col] = idx;
   });
 
+  let columnTotalBungaDibayarIndex = column[columnTotalBungaDibayar];
+  // set column index for hitungan diskop, if has new column "tanggal realisasi bunga" after colum kolektabilitas
+  if (columnTotalBungaDibayarIndex === 18) {
+    column[''] = 19;
+  }
+
   // Map to expected columns using HEADER_MAPPING
   const mappedColumn = {
     'NO LOAN': column['No Loan'],
